@@ -1,10 +1,9 @@
 ---------------------------- MODULE statemachine ----------------------------
-EXTENDS TLC, Sequences, Integers
+EXTENDS TLC, Sequences, Integers, Naturals
 
 (* --algorithm statemachine
-
 variables
-    accessAttemptState = "NULL";
+    remoteAuthState = "NULL";
 
 fair process webProcess = 1
 variables
@@ -12,7 +11,7 @@ variables
     run = TRUE;
 begin P: 
   while run do
-  
+
       StartWebProcess: 
         if webState = "Start" then
             webState := "WebLoginScreen";
@@ -22,18 +21,19 @@ begin P:
     
       WebLoginScreen:
         if webState = "WebLoginScreen" then
-            webState := "TotpScreen";
+            webState := "RemoteAuthScreen";
         else 
             skip;        
         end if;
-
-      TotpScreen:
-        if webState = "TotpScreen" then
+      
+      RemoteAuthScreen:
+        if webState = "RemoteAuthScreen" then
+            
+            remoteAuthState := "Undecided";
+            
             either
-               accessAttemptState := "Undecided";
                webState := "WebLoggedInScreen";
             or
-              accessAttemptState := "Undecided";
                webState := "SmsScreen";
             end either;
         else
@@ -42,7 +42,7 @@ begin P:
     
       SmsScreen:
         if webState = "SmsScreen" then
-            accessAttemptState := "Cancelled";
+            remoteAuthState := "Cancelled";
             webState := "WebLoggedInScreen";       
         else
             skip;
@@ -64,40 +64,43 @@ begin P:
   end while;
 end process;  
 
-
 fair process mobileProcess = 2
 variables
     mobileState = "Start",
     run = TRUE;
-
 begin P2:
     while run do
-
+    
       StartMobileProcess: 
         if mobileState = "Start" then
-            mobileState := "AuthScreen";
+            mobileState := "MobileLoginScreen";
         else
             skip;       
         end if;
         
-      AuthScreen:
-        if mobileState = "AuthScreen" then
-            if accessAttemptState = "Undecided" then
-                mobileState := "AccessAttemptScreen";
+      MobileLoginScreen:
+        if mobileState = "MobileLoginScreen" then
+            mobileState := "QueryRemoteAuthScreen";
+        else
+            skip;       
+        end if;
+        
+      QueryRemoteAuthScreen:
+        if mobileState = "QueryRemoteAuthScreen" then
+            if remoteAuthState = "Undecided" then
+                mobileState := "RemoteAuthDecisionScreen";
             else 
-                mobileState := "MainScreen";
+                mobileState := "MobileLoggedInScreen";
             end if;                                    
         else
             skip;
         end if;                            
     
-      AccessAttemptScreen:
-        if mobileState = "AccessAttemptScreen" then
+      RemoteAuthDecisionScreen:
+        if mobileState = "RemoteAuthDecisionScreen" then
             either
-                assert accessAttemptState = "Undecided";
                 mobileState := "GrantScreen";
             or
-                assert accessAttemptState = "Undecided";
                 mobileState := "RejectScreen";
             end either;
         else
@@ -106,23 +109,24 @@ begin P2:
       
       GrantScreen:
         if mobileState = "GrantScreen" then
-            accessAttemptState := "Granted";
-            mobileState := "MainScreen";
+            assert remoteAuthState = "Undecided";
+            remoteAuthState := "Granted";
+            mobileState := "MobileLoggedInScreen";
         else
             skip;
         end if;                            
       
-
       RejectScreen:
         if mobileState = "RejectScreen" then
-            accessAttemptState := "Rejected";
-            mobileState := "MainScreen";
+            assert remoteAuthState = "Undecided";
+            remoteAuthState := "Rejected";
+            mobileState := "MobileLoggedInScreen";
         else
             skip;
         end if;                            
     
-      MainScreen:
-        if mobileState = "MainScreen" then
+      MobileLoggedInScreen:
+        if mobileState = "MobileLoggedInScreen" then
             mobileState := "Stop";
         else
             skip;
@@ -137,21 +141,19 @@ begin P2:
                 
     end while;
 end process;
-
-
 end algorithm; *)
 
 
-\* BEGIN TRANSLATION (chksum(pcal) = "8d39c6d1" /\ chksum(tla) = "4ac5da7d")
-\* Process variable run of process webProcess at line 12 col 5 changed to run_
-VARIABLES accessAttemptState, pc, webState, run_, mobileState, run
+\* BEGIN TRANSLATION (chksum(pcal) = "382f4ac5" /\ chksum(tla) = "5197a853")
+\* Process variable run of process webProcess at line 11 col 5 changed to run_
+VARIABLES remoteAuthState, pc, webState, run_, mobileState, run
 
-vars == << accessAttemptState, pc, webState, run_, mobileState, run >>
+vars == << remoteAuthState, pc, webState, run_, mobileState, run >>
 
 ProcSet == {1} \cup {2}
 
 Init == (* Global variables *)
-        /\ accessAttemptState = "NULL"
+        /\ remoteAuthState = "NULL"
         (* Process webProcess *)
         /\ webState = "Start"
         /\ run_ = TRUE
@@ -165,7 +167,7 @@ P == /\ pc[1] = "P"
      /\ IF run_
            THEN /\ pc' = [pc EXCEPT ![1] = "StartWebProcess"]
            ELSE /\ pc' = [pc EXCEPT ![1] = "Done"]
-     /\ UNCHANGED << accessAttemptState, webState, run_, mobileState, run >>
+     /\ UNCHANGED << remoteAuthState, webState, run_, mobileState, run >>
 
 StartWebProcess == /\ pc[1] = "StartWebProcess"
                    /\ IF webState = "Start"
@@ -173,33 +175,32 @@ StartWebProcess == /\ pc[1] = "StartWebProcess"
                          ELSE /\ TRUE
                               /\ UNCHANGED webState
                    /\ pc' = [pc EXCEPT ![1] = "WebLoginScreen"]
-                   /\ UNCHANGED << accessAttemptState, run_, mobileState, run >>
+                   /\ UNCHANGED << remoteAuthState, run_, mobileState, run >>
 
 WebLoginScreen == /\ pc[1] = "WebLoginScreen"
                   /\ IF webState = "WebLoginScreen"
-                        THEN /\ webState' = "TotpScreen"
+                        THEN /\ webState' = "RemoteAuthScreen"
                         ELSE /\ TRUE
                              /\ UNCHANGED webState
-                  /\ pc' = [pc EXCEPT ![1] = "TotpScreen"]
-                  /\ UNCHANGED << accessAttemptState, run_, mobileState, run >>
+                  /\ pc' = [pc EXCEPT ![1] = "RemoteAuthScreen"]
+                  /\ UNCHANGED << remoteAuthState, run_, mobileState, run >>
 
-TotpScreen == /\ pc[1] = "TotpScreen"
-              /\ IF webState = "TotpScreen"
-                    THEN /\ \/ /\ accessAttemptState' = "Undecided"
-                               /\ webState' = "WebLoggedInScreen"
-                            \/ /\ accessAttemptState' = "Undecided"
-                               /\ webState' = "SmsScreen"
-                    ELSE /\ TRUE
-                         /\ UNCHANGED << accessAttemptState, webState >>
-              /\ pc' = [pc EXCEPT ![1] = "SmsScreen"]
-              /\ UNCHANGED << run_, mobileState, run >>
+RemoteAuthScreen == /\ pc[1] = "RemoteAuthScreen"
+                    /\ IF webState = "RemoteAuthScreen"
+                          THEN /\ remoteAuthState' = "Undecided"
+                               /\ \/ /\ webState' = "WebLoggedInScreen"
+                                  \/ /\ webState' = "SmsScreen"
+                          ELSE /\ TRUE
+                               /\ UNCHANGED << remoteAuthState, webState >>
+                    /\ pc' = [pc EXCEPT ![1] = "SmsScreen"]
+                    /\ UNCHANGED << run_, mobileState, run >>
 
 SmsScreen == /\ pc[1] = "SmsScreen"
              /\ IF webState = "SmsScreen"
-                   THEN /\ accessAttemptState' = "Cancelled"
+                   THEN /\ remoteAuthState' = "Cancelled"
                         /\ webState' = "WebLoggedInScreen"
                    ELSE /\ TRUE
-                        /\ UNCHANGED << accessAttemptState, webState >>
+                        /\ UNCHANGED << remoteAuthState, webState >>
              /\ pc' = [pc EXCEPT ![1] = "WebLoggedInScreen"]
              /\ UNCHANGED << run_, mobileState, run >>
 
@@ -209,8 +210,7 @@ WebLoggedInScreen == /\ pc[1] = "WebLoggedInScreen"
                            ELSE /\ TRUE
                                 /\ UNCHANGED webState
                      /\ pc' = [pc EXCEPT ![1] = "StopWebProcess"]
-                     /\ UNCHANGED << accessAttemptState, run_, mobileState, 
-                                     run >>
+                     /\ UNCHANGED << remoteAuthState, run_, mobileState, run >>
 
 StopWebProcess == /\ pc[1] = "StopWebProcess"
                   /\ IF webState = "Stop"
@@ -218,74 +218,82 @@ StopWebProcess == /\ pc[1] = "StopWebProcess"
                         ELSE /\ TRUE
                              /\ run_' = run_
                   /\ pc' = [pc EXCEPT ![1] = "P"]
-                  /\ UNCHANGED << accessAttemptState, webState, mobileState, 
-                                  run >>
+                  /\ UNCHANGED << remoteAuthState, webState, mobileState, run >>
 
-webProcess == P \/ StartWebProcess \/ WebLoginScreen \/ TotpScreen
+webProcess == P \/ StartWebProcess \/ WebLoginScreen \/ RemoteAuthScreen
                  \/ SmsScreen \/ WebLoggedInScreen \/ StopWebProcess
 
 P2 == /\ pc[2] = "P2"
       /\ IF run
             THEN /\ pc' = [pc EXCEPT ![2] = "StartMobileProcess"]
             ELSE /\ pc' = [pc EXCEPT ![2] = "Done"]
-      /\ UNCHANGED << accessAttemptState, webState, run_, mobileState, run >>
+      /\ UNCHANGED << remoteAuthState, webState, run_, mobileState, run >>
 
 StartMobileProcess == /\ pc[2] = "StartMobileProcess"
                       /\ IF mobileState = "Start"
-                            THEN /\ mobileState' = "AuthScreen"
+                            THEN /\ mobileState' = "MobileLoginScreen"
                             ELSE /\ TRUE
                                  /\ UNCHANGED mobileState
-                      /\ pc' = [pc EXCEPT ![2] = "AuthScreen"]
-                      /\ UNCHANGED << accessAttemptState, webState, run_, run >>
+                      /\ pc' = [pc EXCEPT ![2] = "MobileLoginScreen"]
+                      /\ UNCHANGED << remoteAuthState, webState, run_, run >>
 
-AuthScreen == /\ pc[2] = "AuthScreen"
-              /\ IF mobileState = "AuthScreen"
-                    THEN /\ IF accessAttemptState = "Undecided"
-                               THEN /\ mobileState' = "AccessAttemptScreen"
-                               ELSE /\ mobileState' = "MainScreen"
-                    ELSE /\ TRUE
-                         /\ UNCHANGED mobileState
-              /\ pc' = [pc EXCEPT ![2] = "AccessAttemptScreen"]
-              /\ UNCHANGED << accessAttemptState, webState, run_, run >>
+MobileLoginScreen == /\ pc[2] = "MobileLoginScreen"
+                     /\ IF mobileState = "MobileLoginScreen"
+                           THEN /\ mobileState' = "QueryRemoteAuthScreen"
+                           ELSE /\ TRUE
+                                /\ UNCHANGED mobileState
+                     /\ pc' = [pc EXCEPT ![2] = "QueryRemoteAuthScreen"]
+                     /\ UNCHANGED << remoteAuthState, webState, run_, run >>
 
-AccessAttemptScreen == /\ pc[2] = "AccessAttemptScreen"
-                       /\ IF mobileState = "AccessAttemptScreen"
-                             THEN /\ \/ /\ Assert(accessAttemptState = "Undecided", 
-                                                  "Failure of assertion at line 97, column 17.")
-                                        /\ mobileState' = "GrantScreen"
-                                     \/ /\ Assert(accessAttemptState = "Undecided", 
-                                                  "Failure of assertion at line 100, column 17.")
-                                        /\ mobileState' = "RejectScreen"
-                             ELSE /\ TRUE
-                                  /\ UNCHANGED mobileState
-                       /\ pc' = [pc EXCEPT ![2] = "GrantScreen"]
-                       /\ UNCHANGED << accessAttemptState, webState, run_, run >>
+QueryRemoteAuthScreen == /\ pc[2] = "QueryRemoteAuthScreen"
+                         /\ IF mobileState = "QueryRemoteAuthScreen"
+                               THEN /\ IF remoteAuthState = "Undecided"
+                                          THEN /\ mobileState' = "RemoteAuthDecisionScreen"
+                                          ELSE /\ mobileState' = "MobileLoggedInScreen"
+                               ELSE /\ TRUE
+                                    /\ UNCHANGED mobileState
+                         /\ pc' = [pc EXCEPT ![2] = "RemoteAuthDecisionScreen"]
+                         /\ UNCHANGED << remoteAuthState, webState, run_, run >>
+
+RemoteAuthDecisionScreen == /\ pc[2] = "RemoteAuthDecisionScreen"
+                            /\ IF mobileState = "RemoteAuthDecisionScreen"
+                                  THEN /\ \/ /\ mobileState' = "GrantScreen"
+                                          \/ /\ mobileState' = "RejectScreen"
+                                  ELSE /\ TRUE
+                                       /\ UNCHANGED mobileState
+                            /\ pc' = [pc EXCEPT ![2] = "GrantScreen"]
+                            /\ UNCHANGED << remoteAuthState, webState, run_, 
+                                            run >>
 
 GrantScreen == /\ pc[2] = "GrantScreen"
                /\ IF mobileState = "GrantScreen"
-                     THEN /\ accessAttemptState' = "Granted"
-                          /\ mobileState' = "MainScreen"
+                     THEN /\ Assert(remoteAuthState = "Undecided", 
+                                    "Failure of assertion at line 112, column 13.")
+                          /\ remoteAuthState' = "Granted"
+                          /\ mobileState' = "MobileLoggedInScreen"
                      ELSE /\ TRUE
-                          /\ UNCHANGED << accessAttemptState, mobileState >>
+                          /\ UNCHANGED << remoteAuthState, mobileState >>
                /\ pc' = [pc EXCEPT ![2] = "RejectScreen"]
                /\ UNCHANGED << webState, run_, run >>
 
 RejectScreen == /\ pc[2] = "RejectScreen"
                 /\ IF mobileState = "RejectScreen"
-                      THEN /\ accessAttemptState' = "Rejected"
-                           /\ mobileState' = "MainScreen"
+                      THEN /\ Assert(remoteAuthState = "Undecided", 
+                                     "Failure of assertion at line 121, column 13.")
+                           /\ remoteAuthState' = "Rejected"
+                           /\ mobileState' = "MobileLoggedInScreen"
                       ELSE /\ TRUE
-                           /\ UNCHANGED << accessAttemptState, mobileState >>
-                /\ pc' = [pc EXCEPT ![2] = "MainScreen"]
+                           /\ UNCHANGED << remoteAuthState, mobileState >>
+                /\ pc' = [pc EXCEPT ![2] = "MobileLoggedInScreen"]
                 /\ UNCHANGED << webState, run_, run >>
 
-MainScreen == /\ pc[2] = "MainScreen"
-              /\ IF mobileState = "MainScreen"
-                    THEN /\ mobileState' = "Stop"
-                    ELSE /\ TRUE
-                         /\ UNCHANGED mobileState
-              /\ pc' = [pc EXCEPT ![2] = "StopMobileProcess"]
-              /\ UNCHANGED << accessAttemptState, webState, run_, run >>
+MobileLoggedInScreen == /\ pc[2] = "MobileLoggedInScreen"
+                        /\ IF mobileState = "MobileLoggedInScreen"
+                              THEN /\ mobileState' = "Stop"
+                              ELSE /\ TRUE
+                                   /\ UNCHANGED mobileState
+                        /\ pc' = [pc EXCEPT ![2] = "StopMobileProcess"]
+                        /\ UNCHANGED << remoteAuthState, webState, run_, run >>
 
 StopMobileProcess == /\ pc[2] = "StopMobileProcess"
                      /\ IF mobileState = "Stop"
@@ -293,12 +301,13 @@ StopMobileProcess == /\ pc[2] = "StopMobileProcess"
                            ELSE /\ TRUE
                                 /\ run' = run
                      /\ pc' = [pc EXCEPT ![2] = "P2"]
-                     /\ UNCHANGED << accessAttemptState, webState, run_, 
+                     /\ UNCHANGED << remoteAuthState, webState, run_, 
                                      mobileState >>
 
-mobileProcess == P2 \/ StartMobileProcess \/ AuthScreen
-                    \/ AccessAttemptScreen \/ GrantScreen \/ RejectScreen
-                    \/ MainScreen \/ StopMobileProcess
+mobileProcess == P2 \/ StartMobileProcess \/ MobileLoginScreen
+                    \/ QueryRemoteAuthScreen \/ RemoteAuthDecisionScreen
+                    \/ GrantScreen \/ RejectScreen \/ MobileLoggedInScreen
+                    \/ StopMobileProcess
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating == /\ \A self \in ProcSet: pc[self] = "Done"
@@ -317,5 +326,5 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 =============================================================================
 \* Modification History
-\* Last modified Sun Sep 26 11:58:38 CEST 2021 by zsolt
+\* Last modified Sun Oct 17 10:27:35 CEST 2021 by zsolt
 \* Created Sun Sep 26 07:46:17 CEST 2021 by zsolt
